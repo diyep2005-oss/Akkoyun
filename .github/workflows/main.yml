@@ -1,0 +1,42 @@
+name: APK Derle
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.9
+      - name: Zip dosyasını aç
+        run: |
+          ZIP="$(find . \( -iname '*.zip' -o -iname '*.zip.bak' \) -not -path './proje/*' | head -n 1)"
+          if [ -z "$ZIP" ]; then
+            echo "HATA: Depoda zip dosyası yok. Depodaki dosyalar:"
+            ls -R | head -n 40
+            exit 1
+          fi
+          echo "Kullanılan zip: $ZIP"
+          unzip -q -o "$ZIP" -d proje
+          sed -i 's/blockNetworkImages/blockNetworkImage/' proje/app/src/main/java/com/gokboru/browser/MainActivity.kt
+      - name: Yeni dosyaları üstüne yaz
+        run: |
+          [ -f MainActivity.kt ] && cp MainActivity.kt proje/app/src/main/java/com/gokboru/browser/MainActivity.kt
+          [ -f hero.jpg ] && cp hero.jpg proje/app/src/main/res/drawable-nodpi/hero.jpg
+          [ -f mosque.jpg ] && cp mosque.jpg proje/app/src/main/res/drawable-nodpi/mosque.jpg
+          sed -i 's/R\.drawable\.hero/resources.getIdentifier("hero", "drawable", packageName)/; s/R\.drawable\.mosque/resources.getIdentifier("mosque", "drawable", packageName)/' proje/app/src/main/java/com/gokboru/browser/MainActivity.kt
+          echo "Resim klasörü:"
+          ls proje/app/src/main/res/drawable-nodpi
+          true
+      - name: Debug APK derle
+        run: gradle assembleDebug --no-daemon -p proje
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Gokboru-Browser-APK
+          path: proje/app/build/outputs/apk/debug/*.apk
